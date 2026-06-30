@@ -1,0 +1,2 @@
+TRUNCATE TABLE public.chat_messages, public.notifications, public.feedback, public.sos_alerts, public.incidents, public.emergency_contacts, public.tourists, public.user_roles, public.profiles RESTART IDENTITY CASCADE;
+DELETE FROM auth.users;
