@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,10 +10,34 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { deleteAccount } from "@/lib/admin-users.functions";
 import { useMyUser } from "@/lib/use-role";
 import { toast } from "sonner";
 import { useState } from "react";
+
+async function deleteAccountViaEdgeFunction(userId: string) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error("Not authenticated");
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/admin-delete-user`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      apikey: anonKey,
+    },
+    body: JSON.stringify({ userId }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Failed to delete account");
+  }
+  return res.json();
+}
 
 export const Route = createFileRoute("/_authenticated/admin/users")({
   component: AdminUsers,
@@ -25,7 +48,6 @@ type Filter = "all" | "admin" | "responder" | "tourist" | "officer";
 function AdminUsers() {
   const qc = useQueryClient();
   const { data: me } = useMyUser();
-  const remove = useServerFn(deleteAccount);
   const [filter, setFilter] = useState<Filter>("all");
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -49,7 +71,7 @@ function AdminUsers() {
   async function onDelete(id: string) {
     setBusy(id);
     try {
-      await remove({ data: { userId: id } });
+      await deleteAccountViaEdgeFunction(id);
       toast.success("Account deleted");
       qc.invalidateQueries({ queryKey: ["all-accounts"] });
     } catch (e: any) {
