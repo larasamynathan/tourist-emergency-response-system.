@@ -12,16 +12,14 @@ export const Route = createFileRoute("/api/nearby")({
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
           return new Response("Invalid coordinates", { status: 400 });
         }
-        const lovableKey = process.env.LOVABLE_API_KEY;
         const mapsKey = process.env.GOOGLE_MAPS_API_KEY;
-        if (!lovableKey || !mapsKey) return new Response("Maps not configured", { status: 500 });
+        if (!mapsKey) return new Response("Maps not configured: set GOOGLE_MAPS_API_KEY", { status: 500 });
 
         const includedType = type === "police" ? "police" : "hospital";
-        const res = await fetch("https://connector-gateway.lovable.dev/google_maps/places/v1/places:searchNearby", {
+        const res = await fetch("https://places.googleapis.com/v1/places:searchNearby", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${lovableKey}`,
-            "X-Connection-Api-Key": mapsKey,
+            "X-Goog-Api-Key": mapsKey,
             "Content-Type": "application/json",
             "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location",
           },
@@ -35,6 +33,7 @@ export const Route = createFileRoute("/api/nearby")({
         });
         if (!res.ok) {
           const t = await res.text();
+          console.error("Places API error:", res.status, t);
           return new Response(t, { status: res.status });
         }
         const json = await res.json();
